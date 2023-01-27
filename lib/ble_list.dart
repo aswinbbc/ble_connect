@@ -29,9 +29,12 @@ class _BleListScreenState extends State<BleListScreen> {
         scanner = flutterReactiveBle.scanForDevices(
             withServices: [], scanMode: ScanMode.lowLatency).listen((device) {
           print(device.name);
-          setState(() {
-            if (!devices.contains(device)) devices.add(device);
-          });
+          if (device.name.contains('SN:0000056214')) {
+            setState(() {
+              if (!devices.contains(device)) devices.add(device);
+              scanner.cancel();
+            });
+          }
         }, onError: (e) {
           print('error $e');
         });
