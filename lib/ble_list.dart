@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'dart:io' show Platform;
+
+import 'package:location_permissions/location_permissions.dart';
 import 'package:ble_connect/detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
@@ -20,16 +23,36 @@ class _BleListScreenState extends State<BleListScreen> {
   @override
   void initState() {
     super.initState();
-    scanner = flutterReactiveBle.scanForDevices(
-        withServices: [], scanMode: ScanMode.lowLatency).listen((device) {
-      print(device.name);
-      setState(() {
-        if (!devices.contains(device)) devices.add(device);
-      });
-    }, onError: (e) {
-      print('error $e');
+    // Platform permissions handling stuff
+    permiCheck().then((value) {
+      if (value) {
+        scanner = flutterReactiveBle.scanForDevices(
+            withServices: [], scanMode: ScanMode.lowLatency).listen((device) {
+          print(device.name);
+          setState(() {
+            if (!devices.contains(device)) devices.add(device);
+          });
+        }, onError: (e) {
+          print('error $e');
+        });
+      }
     });
+
     // flutterReactiveBle
+  }
+
+  Future<bool> permiCheck() async {
+    // Platform permissions handling stuff
+    bool permGranted = false;
+
+    PermissionStatus permission;
+    if (Platform.isAndroid) {
+      permission = await LocationPermissions().requestPermissions();
+      if (permission == PermissionStatus.granted) permGranted = true;
+    } else if (Platform.isIOS) {
+      permGranted = true;
+    }
+    return permGranted;
   }
 
   @override
