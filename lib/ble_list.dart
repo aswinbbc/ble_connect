@@ -6,6 +6,7 @@ import 'package:location_permissions/location_permissions.dart';
 import 'package:ble_connect/detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
+import 'package:lottie/lottie.dart';
 
 class BleListScreen extends StatefulWidget {
   BleListScreen({super.key});
@@ -20,28 +21,39 @@ class _BleListScreenState extends State<BleListScreen> {
   List<DiscoveredDevice> devices = [];
   late StreamSubscription<DiscoveredDevice> scanner;
 
+  var isNotFound = true;
+
   @override
   void initState() {
     super.initState();
     // Platform permissions handling stuff
     permiCheck().then((value) {
       if (value) {
-        scanner = flutterReactiveBle.scanForDevices(
-            withServices: [], scanMode: ScanMode.lowLatency).listen((device) {
-          print(device.name);
-          if (device.name.contains('SN:0000056214')) {
-            setState(() {
-              if (!devices.contains(device)) devices.add(device);
-              scanner.cancel();
-            });
-          }
-        }, onError: (e) {
-          print('error $e');
-        });
+        search();
       }
     });
 
     // flutterReactiveBle
+  }
+
+  search() {
+    setState(() {
+      devices = [];
+      isNotFound = true;
+    });
+    scanner = flutterReactiveBle.scanForDevices(
+        withServices: [], scanMode: ScanMode.lowLatency).listen((device) {
+      print(device.name);
+      if (device.name.contains('SN:0000056214')) {
+        setState(() {
+          if (!devices.contains(device)) devices.add(device);
+          scanner.cancel();
+          isNotFound = false;
+        });
+      }
+    }, onError: (e) {
+      print('error $e');
+    });
   }
 
   Future<bool> permiCheck() async {
@@ -62,28 +74,37 @@ class _BleListScreenState extends State<BleListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('ble list')),
-      body: ListView.builder(
-        itemCount: devices.length,
-        itemBuilder: (context, index) {
-          var device = devices[index];
-          return Card(
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => DetailScreen(device: device),
-                    ));
+      body: Column(
+        children: [
+          Lottie.asset('assets/bluetooth.json', animate: isNotFound),
+          Expanded(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: devices.length,
+              itemBuilder: (context, index) {
+                var device = devices[index];
+                return Card(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DetailScreen(device: device),
+                          ));
+                    },
+                    child: ListTile(
+                        title: Text(device.name),
+                        subtitle: Text(device.toString())),
+                  ),
+                );
               },
-              child: ListTile(
-                  title: Text(device.name), subtitle: Text(device.toString())),
             ),
-          );
-        },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          scanner.isPaused ? scanner.resume() : scanner.pause();
+          search();
         },
       ),
     );
