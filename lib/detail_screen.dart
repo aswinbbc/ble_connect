@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
@@ -21,27 +22,6 @@ class _DetailScreenState extends State<DetailScreen> {
       Uuid.parse("0000fff2-0000-1000-8000-00805f9b34fb");
   final Uuid characteristicReadUuid =
       Uuid.parse("0000fff1-0000-1000-8000-00805f9b34fb");
-  final List<int> username = [
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-  ];
-  final List<int> password = [
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-  ]; //000000 to byte
-  final _passCode =
-      // [245, 15, 0, 4, 95, 59, 54, 56, 52, 55];
-      [0xF5, 0x0F, 0x00, 0x04, 0x5F, 0x40, 0x36, 0x38, 0x34, 0x37];
-
-  int? randomKey;
   bool _connected = false;
   List<int> read = [];
   Stream<ConnectionStateUpdate>? _currentConnectionStream;
@@ -56,8 +36,6 @@ class _DetailScreenState extends State<DetailScreen> {
   void initState() {
     super.initState();
     _connect();
-
-    _passController = TextEditingController(text: stringHexToAscii());
   }
 
   void _connect() {
@@ -109,6 +87,8 @@ class _DetailScreenState extends State<DetailScreen> {
     });
   }
 
+  late final TextEditingController _passController;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -129,60 +109,49 @@ class _DetailScreenState extends State<DetailScreen> {
                   _connected ? "assets/bluetooth.json" : "assets/cat.json",
                   height: 65),
               Text(widget.device.toString()),
-              Text('response :${hex.encode(read)}',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              // TextField(controller: _passController),
-              ElevatedButton(
-                onPressed: () {
-                  writePassword().then((value) => readResponse());
-                },
-                child: const Text('Pair with Password',
-                    style: TextStyle(fontSize: 20)),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  requestRandomCode()
-                      .then((value) => readResponse().then((value) {
-                            setState(() {
-                              randomKey = value.last;
-                              randomCode =
-                                  "Random Code : {ascii: ${String.fromCharCodes([
-                                    value.last,
-                                    value[value.length - 2]
-                                  ])}    #HEX : ${value[value.length - 2].toRadixString(16)},${value.last.toRadixString(16)} }";
-                            });
-                          }));
-                },
-                child: const Text('Request Random Code',
-                    style: TextStyle(fontSize: 20)),
-              ),
-              Text(
-                randomCode,
-                style: const TextStyle(fontSize: 25),
-              ),
-              RadioListTile(
-                value: 0x01,
-                groupValue: selectedUser,
-                onChanged: (ind) => setState(() => selectedUser = ind!),
-                title: const Text("admin"),
-              ),
-              RadioListTile(
-                value: 0x02,
-                groupValue: selectedUser,
-                onChanged: (ind) => setState(() => selectedUser = ind!),
-                title: const Text("user"),
-              ),
-              RadioListTile(
-                value: 0x04,
-                groupValue: selectedUser,
-                onChanged: (ind) => setState(() => selectedUser = ind!),
-                title: const Text("one time user"),
-              ),
-              ElevatedButton(
-                  onPressed: () {
-                    createXORList();
-                  },
-                  child: const Text('EX-OR'))
+              Text('connection $_connected'),
+              Row(
+                children: [
+                  ElevatedButton(
+                      onPressed: () async {
+                        final characteristic = QualifiedCharacteristic(
+                            serviceId: serviceUuid,
+                            characteristicId: characteristicWriteUuid,
+                            deviceId: widget.device.id);
+                        await flutterReactiveBle
+                            .writeCharacteristicWithResponse(characteristic,
+                                //F5 0F 00 04 5F 3B 36 38 34 37
+                                value: [
+                              0xF5,
+                              0x0F,
+                              0x00,
+                              0x04,
+                              0x5F,
+                              0x3B,
+                              0x36,
+                              0x38,
+                              0x34,
+                              0x37
+                            ]);
+                      },
+                      child: const Text('Write pass')),
+                  ElevatedButton(
+                      onPressed: () async {
+                        final characteristic = QualifiedCharacteristic(
+                            serviceId: serviceUuid,
+                            characteristicId: characteristicReadUuid,
+                            deviceId: widget.device.id);
+                        var response =
+                            await flutterReactiveBle.readCharacteristic(
+                          characteristic,
+                        );
+                        print(response
+                            .map((e) => e.toRadixString(16).padLeft(2, '0'))
+                            .toList());
+                      },
+                      child: const Text('Read')),
+                ],
+              )
             ],
           ),
         ),
