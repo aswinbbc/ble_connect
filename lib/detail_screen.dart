@@ -51,7 +51,6 @@ class _DetailScreenState extends State<DetailScreen> {
   void initState() {
     super.initState();
     _connect();
-
   }
 
   void _connect() {
@@ -201,6 +200,7 @@ class _DetailScreenState extends State<DetailScreen> {
   List<int> createXORList() {
     // randomKey = 0xB3;
     List<int> exorList = [];
+    late int sixthByte;
     if (randomKey != null) {
       int keyExor = exorWithKey(x: selectedUser, key: randomKey!);
       List<int> sendingCode = [
@@ -209,13 +209,30 @@ class _DetailScreenState extends State<DetailScreen> {
         0x00,
         0x0d,
         0x5f,
-        0x1c,
+        //0x1c,
       ];
+      final xorUsername =
+          username.map((e) => exorWithKey(x: e, key: randomKey!)).toList();
+      final xorPassword =
+          password.map((e) => exorWithKey(x: e, key: randomKey!)).toList();
+
+      // /add 1 st byte to 5 and 7 till 19 th byte after xor operation
+      sixthByte = (sendingCode.reduce((a, b) => a + b)) +
+          keyExor +
+          (xorUsername.reduce((a, b) => a + b)) +
+          (xorPassword.reduce((a, b) => a + b));
+
+      // ///add 1 st byte to 5 and 7 till 19 th byte before xor operation
+      // sixthByte = (sendingCode.reduce((a, b) => a + b)) +
+      //     selectedUser +
+      //     (username.reduce((a, b) => a + b)) +
+      //     (password.reduce((a, b) => a + b));
       exorList = [
         ...sendingCode,
+        sixthByte,
         keyExor,
-        ...username.map((e) => exorWithKey(x: e, key: randomKey!)).toList(),
-        ...password.map((e) => exorWithKey(x: e, key: randomKey!)).toList()
+        ...xorUsername,
+        ...xorPassword,
       ];
     }
     if (kDebugMode) {
