@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:ffi';
 
+import 'package:convert/convert.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:lottie/lottie.dart';
-import 'package:convert/convert.dart';
 
 class DetailScreen extends StatefulWidget {
   const DetailScreen({super.key, required this.device});
@@ -29,6 +28,7 @@ class _DetailScreenState extends State<DetailScreen> {
     0x00,
     0x00,
   ];
+  List<int> exorList = [];
   final List<int> password = [
     0x30,
     0x30,
@@ -37,17 +37,12 @@ class _DetailScreenState extends State<DetailScreen> {
     0x30,
     0x30,
   ]; //000000 to byte
-  final _passCode =
-      // [245, 15, 0, 4, 95, 59, 54, 56, 52, 55];
-      [0xF5, 0x0F, 0x00, 0x04, 0x5F, 0x40, 0x36, 0x38, 0x34, 0x37];
 
   int? randomKey;
   bool _connected = false;
   List<int> read = [];
   Stream<ConnectionStateUpdate>? _currentConnectionStream;
   StreamSubscription<ConnectionStateUpdate>? listener;
-  late final TextEditingController _passController;
-  late HexEncoder _hexEncoder;
 
   String randomCode = '';
 
@@ -57,10 +52,13 @@ class _DetailScreenState extends State<DetailScreen> {
     super.initState();
     _connect();
 
-    _passController = TextEditingController(text: stringHexToAscii());
   }
 
   void _connect() {
+    if (_connected) {
+      readResponse();
+      return;
+    }
     if (_currentConnectionStream != null) {
       listener!.cancel();
       _currentConnectionStream = null;
@@ -97,7 +95,7 @@ class _DetailScreenState extends State<DetailScreen> {
             setState(() {
               // _foundDeviceWaitingToConnect = false;
               _connected = false;
-              read = [];
+              // read = [];
             });
             break;
           }
@@ -105,7 +103,9 @@ class _DetailScreenState extends State<DetailScreen> {
       }
     }, onError: (error) {
       // Handle a possible error
-      print('error: $error');
+      if (kDebugMode) {
+        print('error: $error');
+      }
     });
   }
 
@@ -123,7 +123,7 @@ class _DetailScreenState extends State<DetailScreen> {
             children: [
               Text(
                 'connection status: ${_connected ? 'connected' : 'disconnected'}',
-                style: TextStyle(fontWeight: FontWeight.w600),
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               Lottie.asset(
                   _connected ? "assets/bluetooth.json" : "assets/cat.json",
@@ -156,8 +156,8 @@ class _DetailScreenState extends State<DetailScreen> {
                 child: const Text('Request Random Code',
                     style: TextStyle(fontSize: 20)),
               ),
-              Text(
-                randomCode,
+              SelectableText(
+                (randomKey ?? 0).toRadixString(16),
                 style: const TextStyle(fontSize: 25),
               ),
               RadioListTile(
@@ -182,7 +182,14 @@ class _DetailScreenState extends State<DetailScreen> {
                   onPressed: () {
                     createXORList();
                   },
-                  child: const Text('EX-OR'))
+                  child: const Text('Create EX-OR List')),
+              SelectableText('${intListToHexStringList(exorList)}'),
+
+              ElevatedButton(
+                  onPressed: () {
+                    sendXORList().then((value) => readResponse());
+                  },
+                  child: const Text('Send EX-OR List')),
             ],
           ),
         ),
@@ -192,9 +199,10 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   List<int> createXORList() {
+    // randomKey = 0xB3;
     List<int> exorList = [];
     if (randomKey != null) {
-      int keyExor = exorWithKey(x: randomKey!);
+      int keyExor = exorWithKey(x: selectedUser, key: randomKey!);
       List<int> sendingCode = [
         0xf5,
         0x21,
@@ -206,15 +214,46 @@ class _DetailScreenState extends State<DetailScreen> {
       exorList = [
         ...sendingCode,
         keyExor,
-        ...username.map((e) => exorWithKey(x: e, key: selectedUser)).toList(),
-        ...password.map((e) => exorWithKey(x: e, key: selectedUser)).toList()
+        ...username.map((e) => exorWithKey(x: e, key: randomKey!)).toList(),
+        ...password.map((e) => exorWithKey(x: e, key: randomKey!)).toList()
       ];
     }
-    print(exorList);
+    if (kDebugMode) {
+      print(exorList);
+    }
+    setState(() {
+      this.exorList = exorList;
+    });
+    if (kDebugMode) {
+      print(intListToHexStringList(exorList));
+    }
     return exorList;
   }
 
-  Future<void> requestRandomCode() async {
+  Future<int> sendXORList() async {
+    final characteristic = QualifiedCharacteristic(
+        serviceId: serviceUuid,
+        characteristicId: characteristicWriteUuid,
+        deviceId: widget.device.id);
+    var hexList =
+        (intListToHexStringList(exorList).map((e) => int.parse(e)).toList());
+    await flutterReactiveBle.writeCharacteristicWithResponse(characteristic,
+        value: hexList);
+
+    return 1;
+  }
+
+  List<String> intListToHexStringList(List<int> intList) {
+    List<String> hexStringList = [];
+    for (int decimal in intList) {
+      String hexString =
+          '0x${decimal.toRadixString(16).padLeft(2, '0').toUpperCase()}';
+      hexStringList.add(hexString);
+    }
+    return hexStringList;
+  }
+
+  Future<int> requestRandomCode() async {
     final characteristic = QualifiedCharacteristic(
         serviceId: serviceUuid,
         characteristicId: characteristicWriteUuid,
@@ -222,12 +261,14 @@ class _DetailScreenState extends State<DetailScreen> {
     await flutterReactiveBle.writeCharacteristicWithResponse(characteristic,
         value: [0xF5, 0x20, 0x00, 0x00, 0x5F, 0x74]);
 
-    return;
+    return 1;
   }
 
-  exorWithKey({int x = 0x01, int key = 0x4f}) {
+  int exorWithKey({int x = 0x01, int key = 0x4f}) {
+    // key = 0x4f;
+    // key = int.parse('b3', radix: 16);
     var r = (x ^ key);
-    print(r.toRadixString(16));
+
     return r;
   }
 
@@ -239,14 +280,19 @@ class _DetailScreenState extends State<DetailScreen> {
     var response = await flutterReactiveBle.readCharacteristic(
       characteristic,
     );
-    print(response);
+    if (kDebugMode) {
+      print(response);
+    }
     setState(() {
+      if (kDebugMode) {
+        print(hex.encode(read));
+      }
       read = response;
     });
     return response;
   }
 
-  Future<void> writePassword() async {
+  Future<int> writePassword() async {
     final characteristic = QualifiedCharacteristic(
         serviceId: serviceUuid,
         characteristicId: characteristicWriteUuid,
@@ -261,7 +307,7 @@ class _DetailScreenState extends State<DetailScreen> {
     // await flutterReactiveBle
     //     .writeCharacteristicWithResponse(characteristic,
     //         value: [245, 15, 0, 4, 95, 59, 54, 56, 52, 55]);
-    return;
+    return 1;
   }
 
   String stringHexToAscii() {

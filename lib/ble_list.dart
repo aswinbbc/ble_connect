@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart';
 import 'package:location_permissions/location_permissions.dart';
 import 'package:ble_connect/detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +10,7 @@ import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:lottie/lottie.dart';
 
 class BleListScreen extends StatefulWidget {
-  BleListScreen({super.key});
+  const BleListScreen({super.key});
 
   @override
   State<BleListScreen> createState() => _BleListScreenState();
@@ -43,7 +44,9 @@ class _BleListScreenState extends State<BleListScreen> {
     });
     scanner = flutterReactiveBle.scanForDevices(
         withServices: [], scanMode: ScanMode.lowLatency).listen((device) {
-      print(device.name);
+      if (kDebugMode) {
+        print(device.name);
+      }
       if (device.name.contains('SN:0000056214')) {
         setState(() {
           if (!devices.contains(device)) devices.add(device);
@@ -52,7 +55,9 @@ class _BleListScreenState extends State<BleListScreen> {
         });
       }
     }, onError: (e) {
-      print('error $e');
+      if (kDebugMode) {
+        print('error $e');
+      }
     });
   }
 
@@ -73,7 +78,7 @@ class _BleListScreenState extends State<BleListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('ble list')),
+      appBar: AppBar(title: const Text('ble list')),
       body: Column(
         children: [
           Lottie.asset('assets/bluetooth.json', animate: isNotFound),
