@@ -38,6 +38,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   convert: 
   flutter_reactive_ble: ^5.0.3
+  flutter_blue: ^0.8.0
   location_permissions: ^4.0.1
   lottie: ^2.2.0
 

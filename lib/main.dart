@@ -1,4 +1,6 @@
 import 'package:ble_connect/ble_list.dart';
+import 'package:ble_connect/vodafone/fblue.dart';
+import 'package:ble_connect/vodafone/home_page.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -15,7 +17,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home:  const BleListScreen(),
+      home: MyHomePage(),
     );
   }
 }

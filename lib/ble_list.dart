@@ -47,7 +47,7 @@ class _BleListScreenState extends State<BleListScreen> {
       if (kDebugMode) {
         print(device.name);
       }
-      if (device.name.contains('SN:0000056214')) {
+      if (device.name.contains('ADXTEST')) {
         setState(() {
           if (!devices.contains(device)) devices.add(device);
           scanner.cancel();
